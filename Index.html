@@ -1,0 +1,2069 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0b0f19" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>PulseDesk — Offline-First Personal Secretary &amp; Accountability Agent</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: #0b0f19;
+      color: #e2e8f0;
+    }
+    .glass-card {
+      background: rgba(17, 24, 39, 0.86);
+      border: 1px solid rgba(148, 163, 184, 0.14);
+      backdrop-filter: blur(12px);
+    }
+    .mic-pulse {
+      animation: pulseRing 1.4s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+    }
+    @keyframes pulseRing {
+      0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.65); }
+      70% { box-shadow: 0 0 0 12px rgba(239, 68, 68, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+    }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.25); border-radius: 9999px; }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+  <!-- Toast Container -->
+  <div id="toastContainer" class="fixed top-4 right-4 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none px-4 sm:px-0"></div>
+
+  <!-- Header -->
+  <header class="border-b border-slate-800/80 bg-slate-950/85 sticky top-0 z-30 backdrop-blur">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-cyan-500 flex items-center justify-center shadow-lg shadow-indigo-500/20">
+          <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+          </svg>
+        </div>
+        <div>
+          <div class="flex flex-wrap items-center gap-2">
+            <h1 class="text-base sm:text-lg font-bold tracking-tight text-white">PulseDesk</h1>
+            <span class="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700" id="schemaVersionBadge">v2.0 Schema</span>
+            <span id="connectionBadge" class="text-[11px] font-medium px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30">
+              Offline Agent
+            </span>
+          </div>
+          <p class="text-xs text-slate-400" id="liveClockLabel">Loading time...</p>
+        </div>
+      </div>
+
+      <!-- Accountability & Mode Controls -->
+      <div class="flex flex-wrap items-center gap-2">
+        <div class="flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-slate-900/95 border border-slate-800 text-xs">
+          <span class="text-slate-400" title="Strict Accountability XP">XP: <strong id="statXP" class="text-indigo-400">100</strong> <span id="statLevel" class="text-[10px] text-slate-500">(Lv.1)</span></span>
+          <span class="text-slate-700">|</span>
+          <span class="text-slate-400">Done: <strong id="statDone" class="text-emerald-400">0/0</strong></span>
+          <span class="hidden md:inline text-slate-700">|</span>
+          <span class="hidden md:inline text-slate-400">Focus: <strong id="statFocus" class="text-cyan-400">0m</strong></span>
+          <span class="text-slate-700">|</span>
+          <span class="text-slate-400">Streak: <strong id="statStreak" class="text-amber-400">1d</strong></span>
+        </div>
+
+        <button id="btnLowEnergyMode" type="button" class="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 transition flex items-center gap-1.5" title="Scale today's tasks down to 10-min Minimum Viable Versions to protect your streak">
+          <span>⚡ Low-Energy</span>
+          <span id="lowEnergyChargesLabel" class="text-[10px] px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-200">2/2</span>
+        </button>
+
+        <button id="btnOpenTimetable" type="button" class="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition">
+          Timetable
+        </button>
+
+        <button id="btnOpenSync" type="button" class="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700 transition">
+          Sync &amp; GitHub
+        </button>
+
+        <button id="btnNotifyPerm" type="button" class="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition flex items-center gap-1" title="Enable Desktop &amp; Phone Reminders">
+          <svg class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+          </svg>
+          <span class="hidden xl:inline">Reminders</span>
+        </button>
+
+        <button id="btnOpenSettings" type="button" class="px-3 py-1.5 rounded-lg text-xs font-medium bg-indigo-600 hover:bg-indigo-500 text-white transition flex items-center gap-1.5 shadow-sm">
+          <span>Gemini API</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Pace Calibration Banner (Appears when a learning/goal task is completed) -->
+  <div id="paceCalibrationBanner" class="hidden bg-indigo-950/90 border-b border-indigo-500/40 px-4 py-2.5">
+    <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2 text-xs">
+      <div class="flex items-center gap-2">
+        <span class="px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 font-semibold">Pace Calibration</span>
+        <span id="paceBannerText" class="text-slate-200">How was the time allocation for that task?</span>
+      </div>
+      <div class="flex items-center gap-1.5">
+        <button type="button" data-pace="fast" class="pace-feedback-btn px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-emerald-300 border border-slate-700 font-medium">Finished Early (-15% time next)</button>
+        <button type="button" data-pace="right" class="pace-feedback-btn px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-medium">Just Right (Keep Pace)</button>
+        <button type="button" data-pace="slow" class="pace-feedback-btn px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 font-medium">Need More Practice (+20% &amp; drill)</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Content -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 py-4 flex flex-col gap-4">
+
+    <!-- Command / Dictation & Learning Style Bar -->
+    <section class="glass-card rounded-2xl p-4 shadow-xl">
+      <div class="flex flex-col gap-3">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <label for="agentInput" class="text-xs font-semibold uppercase tracking-wider text-indigo-300 flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-indigo-400"></span>
+            Secretary Command &amp; Goal Decomposer
+          </label>
+          <div class="flex flex-wrap items-center gap-2 text-xs">
+            <span class="text-slate-400">Style:</span>
+            <select id="learningStyleSelect" class="rounded-lg bg-slate-900 border border-slate-700 px-2 py-1 text-xs text-cyan-300 outline-none">
+              <option value="video">Video-First + Notes</option>
+              <option value="handson">Hands-On Code / Practice</option>
+              <option value="reading">Reading + Summary</option>
+            </select>
+            <span class="text-slate-400">Pace: <strong id="paceMultiplierLabel" class="text-emerald-300">1.00x</strong></span>
+            <span class="text-slate-700">|</span>
+            <button id="btnVoiceReplyToggle" type="button" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-[11px] text-indigo-300 border border-slate-700 transition" title="Toggle Secretary Voice Read-Aloud">🔊 Voice Reply: Off</button>
+            <span class="text-slate-700">|</span>
+            <span id="micStatus" class="text-xs text-slate-400">Mic Ready</span>
+          </div>
+        </div>
+
+        <div class="flex flex-col sm:flex-row gap-2.5">
+          <div class="relative flex-1">
+            <textarea id="agentInput" rows="2" placeholder="Dictate or type: e.g. 'My goal is developing my own OS', 'I want to build a fit body', 'Saturday follows Friday timetable', or 'I am procrastinating'" class="w-full rounded-xl bg-slate-900/90 border border-slate-700/80 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-500 resize-none"></textarea>
+          </div>
+          <div class="flex sm:flex-col gap-2 shrink-0">
+            <button id="btnMic" type="button" class="flex-1 sm:flex-none px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-100 border border-slate-700 text-xs font-semibold flex items-center justify-center gap-1.5 transition">
+              <svg class="w-4 h-4 text-rose-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+              </svg>
+              <span id="btnMicText">Dictate</span>
+            </button>
+            <button id="btnSendAgent" type="button" class="flex-1 sm:flex-none px-5 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-cyan-600 hover:from-indigo-500 hover:to-cyan-500 text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition shadow-md shadow-indigo-500/20">
+              <span>Run Agent</span>
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Live Secretary Conversation Stream (Primary Agent-First Interface) -->
+        <div class="bg-slate-950/85 border border-slate-800/90 rounded-xl p-3 flex flex-col gap-2.5">
+          <div class="flex items-center justify-between border-b border-slate-800/80 pb-2">
+            <div class="flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+              <span class="text-xs font-bold text-white">Live Secretary Conversation</span>
+              <span class="text-[11px] text-slate-400 hidden sm:inline">— Talk to me to manage tasks, hangouts, timetable overrides &amp; goals</span>
+            </div>
+            <button id="btnClearLog" type="button" class="text-[11px] text-slate-400 hover:text-slate-200">Clear</button>
+          </div>
+          <div id="agentLog" class="overflow-y-auto max-h-[220px] flex flex-col gap-2.5 pr-1 text-xs"></div>
+          <!-- Contextual Secretary Action Chips -->
+          <div id="secretaryActionChips" class="flex flex-wrap items-center gap-1.5 pt-1 border-t border-slate-800/60"></div>
+        </div>
+
+        <!-- Quick Prompts -->
+        <div class="flex flex-wrap items-center gap-1.5">
+          <span class="text-[11px] text-slate-500 mr-1">Ask Secretary:</span>
+          <button type="button" class="quick-prompt px-2.5 py-1 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-[11px] text-slate-300 border border-slate-700/60 transition" data-prompt="My goal is developing my own OS. Break it into concrete micro-tasks matching my learning style and schedule the first step today.">
+            Goal: Build My Own OS
+          </button>
+          <button type="button" class="quick-prompt px-2.5 py-1 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-[11px] text-slate-300 border border-slate-700/60 transition" data-prompt="I want to make a fit body. Adjust my schedule today with a workout and protein check-in.">
+            + Goal: Fit Body
+          </button>
+          <button type="button" class="quick-prompt px-2.5 py-1 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-[11px] text-slate-300 border border-slate-700/60 transition" data-prompt="I am hanging out with my person for 60 minutes. Start hangout mode and tell me my Point of No Return.">
+            Start 60m Hangout
+          </button>
+          <button type="button" class="quick-prompt px-2.5 py-1 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-[11px] text-slate-300 border border-slate-700/60 transition" data-prompt="I am procrastinating right now. Break my next task into a 2-minute step and start focus mode.">
+            Beat Procrastination
+          </button>
+          <button type="button" class="quick-prompt px-2.5 py-1 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-[11px] text-slate-300 border border-slate-700/60 transition" data-prompt="Remind me to drink water and stretch in 20 minutes.">
+            + Quick Reminder
+          </button>
+          <button type="button" class="quick-prompt px-2.5 py-1 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-[11px] text-slate-300 border border-slate-700/60 transition" data-prompt="Review my remaining schedule for today and tell me what to focus on first.">
+            Prioritize My Day
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Mobile Section Tabs -->
+    <div class="flex lg:hidden gap-1.5 bg-slate-900/90 p-1 rounded-xl border border-slate-800">
+      <button type="button" class="mobile-tab flex-1 py-2 text-xs font-semibold rounded-lg bg-indigo-600 text-white" data-tab="schedule">Schedule</button>
+      <button type="button" class="mobile-tab flex-1 py-2 text-xs font-semibold rounded-lg text-slate-400" data-tab="goals">Goals</button>
+      <button type="button" class="mobile-tab flex-1 py-2 text-xs font-semibold rounded-lg text-slate-400" data-tab="focus">Focus &amp; Chat</button>
+    </div>
+
+    <!-- 3-Column Workspace -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 flex-1">
+
+      <!-- Column 1: Adaptive Timetable & Today's Schedule (5 cols) -->
+      <section id="panel-schedule" class="lg:col-span-5 glass-card rounded-2xl p-4 flex flex-col gap-3.5">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h2 class="text-sm font-bold text-white">Adaptive Daily Schedule</h2>
+            <p class="text-xs text-slate-400">Locked timetable + deadline-ranked tasks</p>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <select id="dayModeSelect" class="rounded-lg bg-slate-900 border border-slate-700 px-2.5 py-1.5 text-xs text-indigo-300 font-medium outline-none" title="Override today's fixed timetable">
+              <option value="normal">Mode: Normal Day</option>
+              <option value="friday">Override: Follow Friday</option>
+              <option value="Monday">Override: Follow Monday</option>
+              <option value="exam">Mode: Exam Week (No Classes)</option>
+              <option value="holiday">Mode: Holiday (All Free)</option>
+            </select>
+            <button id="btnToggleAddTask" type="button" class="px-2.5 py-1.5 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/30 text-xs font-medium text-indigo-300 border border-indigo-500/30 transition">
+              + Add Task
+            </button>
+          </div>
+        </div>
+
+        <!-- Inline Add Task Form (with Deadline & Priority) -->
+        <form id="addTaskForm" class="hidden bg-slate-900/95 border border-slate-800 rounded-xl p-3 flex flex-col gap-2.5">
+          <input id="taskTitleInput" type="text" required placeholder="Concrete task (e.g., Watch 20m x86 Bootloader Video & write 3 notes)" class="w-full rounded-lg bg-slate-950 border border-slate-700 px-3 py-1.5 text-xs text-white outline-none focus:border-indigo-500" />
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <div>
+              <label class="text-[10px] text-slate-400 block mb-1">Start Time</label>
+              <input id="taskTimeInput" type="time" required class="w-full rounded-lg bg-slate-950 border border-slate-700 px-2 py-1.5 text-xs text-white outline-none" />
+            </div>
+            <div>
+              <label class="text-[10px] text-slate-400 block mb-1">Duration (m)</label>
+              <input id="taskDurationInput" type="number" min="5" max="240" value="25" class="w-full rounded-lg bg-slate-950 border border-slate-700 px-2 py-1.5 text-xs text-white outline-none" />
+            </div>
+            <div>
+              <label class="text-[10px] text-slate-400 block mb-1">Category</label>
+              <select id="taskCategoryInput" class="w-full rounded-lg bg-slate-950 border border-slate-700 px-2 py-1.5 text-xs text-white outline-none">
+                <option value="Study">Study</option>
+                <option value="Fitness">Fitness</option>
+                <option value="Focus">Focus</option>
+                <option value="Health">Health</option>
+                <option value="Personal">Personal</option>
+              </select>
+            </div>
+            <div>
+              <label class="text-[10px] text-slate-400 block mb-1">Deadline</label>
+              <input id="taskDeadlineInput" type="date" class="w-full rounded-lg bg-slate-950 border border-slate-700 px-2 py-1.5 text-xs text-white outline-none" />
+            </div>
+          </div>
+          <div class="flex items-center justify-between pt-1">
+            <label class="flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
+              <input id="taskRemindInput" type="checkbox" checked class="rounded border-slate-600 bg-slate-950 text-indigo-500" />
+              <span>Nudge me at start time</span>
+            </label>
+            <div class="flex gap-2">
+              <button id="btnCancelTask" type="button" class="px-2.5 py-1 rounded-lg text-xs text-slate-400 hover:text-white">Cancel</button>
+              <button type="submit" class="px-3 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-xs font-semibold text-white">Save</button>
+            </div>
+          </div>
+        </form>
+
+        <!-- Filter Tabs -->
+        <div class="flex items-center justify-between gap-2 text-xs">
+          <div class="flex gap-1.5">
+            <button type="button" class="sched-filter px-2.5 py-1 rounded-lg bg-indigo-600/20 text-indigo-300 border border-indigo-500/30 font-medium" data-filter="all">All</button>
+            <button type="button" class="sched-filter px-2.5 py-1 rounded-lg bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800" data-filter="pending">Pending</button>
+            <button type="button" class="sched-filter px-2.5 py-1 rounded-lg bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800" data-filter="done">Completed</button>
+          </div>
+          <span id="freeSlotsSummary" class="text-[11px] text-slate-400">Calculating gaps...</span>
+        </div>
+
+        <!-- Task & Timetable List -->
+        <div id="scheduleList" class="flex flex-col gap-2 overflow-y-auto max-h-[470px] pr-1"></div>
+      </section>
+
+      <!-- Column 2: Micro-Task Goals & Deadline Priority Engine (3 cols) -->
+      <section id="panel-goals" class="hidden lg:flex lg:col-span-3 glass-card rounded-2xl p-4 flex-col gap-3.5">
+        <div class="flex items-center justify-between">
+          <div>
+            <h2 class="text-sm font-bold text-white">Goal Roadmap Engine</h2>
+            <p class="text-xs text-slate-400">Concrete micro-steps scaled to your pace</p>
+          </div>
+          <button id="btnToggleAddGoal" type="button" class="px-2.5 py-1.5 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 text-xs font-medium text-emerald-300 border border-emerald-500/30 transition">
+            + Goal
+          </button>
+        </div>
+
+        <form id="addGoalForm" class="hidden bg-slate-900/95 border border-slate-800 rounded-xl p-3 flex flex-col gap-2">
+          <input id="goalTitleInput" type="text" required placeholder="Long-term Goal (e.g., Develop My Own OS)" class="w-full rounded-lg bg-slate-950 border border-slate-700 px-3 py-1.5 text-xs text-white outline-none focus:border-emerald-500" />
+          <input id="goalStepInput" type="text" required placeholder="Next Micro-Task (e.g., Watch 20m Bootloader Video)" class="w-full rounded-lg bg-slate-950 border border-slate-700 px-3 py-1.5 text-xs text-white outline-none focus:border-emerald-500" />
+          <div class="grid grid-cols-2 gap-2">
+            <input id="goalDurationInput" type="number" min="10" max="120" value="25" placeholder="Base Mins" class="w-full rounded-lg bg-slate-950 border border-slate-700 px-2.5 py-1.5 text-xs text-white outline-none" />
+            <input id="goalDeadlineInput" type="date" class="w-full rounded-lg bg-slate-950 border border-slate-700 px-2.5 py-1.5 text-xs text-white outline-none" />
+          </div>
+          <div class="flex justify-end gap-2 pt-1">
+            <button id="btnCancelGoal" type="button" class="px-2 py-1 text-xs text-slate-400 hover:text-white">Cancel</button>
+            <button type="submit" class="px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-xs font-semibold text-white">Add Goal</button>
+          </div>
+        </form>
+
+        <div id="goalsList" class="flex flex-col gap-2.5 overflow-y-auto max-h-[470px] pr-1"></div>
+      </section>
+
+      <!-- Column 3: Hangout Mode (Point of No Return), Focus Timer & Secretary Log (4 cols) -->
+      <section id="panel-focus" class="hidden lg:flex lg:col-span-4 flex-col gap-3.5">
+
+        <!-- Hangout Mode & Point of No Return Card -->
+        <div class="glass-card rounded-2xl p-4 flex flex-col gap-2.5 border border-rose-500/20">
+          <div class="flex items-center justify-between">
+            <div>
+              <h2 class="text-sm font-bold text-white flex items-center gap-1.5">
+                <span>🕒 Hangout / Social Time Budget</span>
+              </h2>
+              <p class="text-[11px] text-slate-400">Protects time with your person without missing essentials</p>
+            </div>
+            <span id="ponrBadge" class="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-rose-500/15 text-rose-300 border border-rose-500/30">
+              Cutoff: --:--
+            </span>
+          </div>
+
+          <div class="flex items-center justify-between bg-slate-950/80 border border-slate-800 rounded-xl px-3.5 py-2.5">
+            <div>
+              <div class="text-[10px] uppercase tracking-wider text-slate-400">Hangout Timer</div>
+              <div id="hangoutTimerDisplay" class="text-xl font-bold text-rose-300 tabular-nums">00:00</div>
+            </div>
+            <div class="flex flex-wrap gap-1.5">
+              <button type="button" class="hangout-preset px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs text-slate-200 border border-slate-700" data-mins="30">30m</button>
+              <button type="button" class="hangout-preset px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs text-slate-200 border border-slate-700" data-mins="60">60m</button>
+              <button type="button" class="hangout-preset px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs text-slate-200 border border-slate-700" data-mins="90">90m</button>
+              <button id="btnStopHangout" type="button" class="px-2.5 py-1 rounded-lg bg-rose-600/20 hover:bg-rose-600/30 text-xs text-rose-300 border border-rose-500/30">Stop</button>
+            </div>
+          </div>
+          <p id="ponrExplanation" class="text-[11px] text-slate-400 leading-snug"></p>
+        </div>
+
+        <!-- Focus & Anti-Procrastination Card -->
+        <div class="glass-card rounded-2xl p-4 flex flex-col gap-2.5">
+          <div class="flex items-center justify-between">
+            <div>
+              <h2 class="text-sm font-bold text-white">Focus &amp; 2-Min Micro-Step Timer</h2>
+              <p class="text-xs text-slate-400 truncate max-w-[230px]" id="focusActiveTaskLabel">No task pinned — pick one or start 2-min rule</p>
+            </div>
+            <span id="timerModeBadge" class="text-[11px] px-2 py-0.5 rounded-full bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 font-medium">25m Focus</span>
+          </div>
+
+          <div class="flex items-center justify-between bg-slate-950/80 border border-slate-800 rounded-xl px-4 py-2.5">
+            <div id="timerDisplay" class="text-2xl font-bold tracking-wider text-white tabular-nums">25:00</div>
+            <div class="flex items-center gap-1.5">
+              <button id="btnTimerToggle" type="button" class="px-3.5 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-xs font-semibold text-white transition">Start</button>
+              <button id="btnTimerReset" type="button" class="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs text-slate-300 transition">Reset</button>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-4 gap-1.5">
+            <button type="button" class="timer-preset py-1 rounded-lg bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/30 text-[11px] font-semibold transition" data-mins="2" data-label="2m Jumpstart">2m Start</button>
+            <button type="button" class="timer-preset py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-[11px] font-medium transition" data-mins="25" data-label="25m Focus">25m Focus</button>
+            <button type="button" class="timer-preset py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-[11px] font-medium transition" data-mins="45" data-label="45m Deep">45m Deep</button>
+            <button type="button" class="timer-preset py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-[11px] font-medium transition" data-mins="5" data-label="5m Break">5m Break</button>
+          </div>
+        </div>
+
+        <!-- Strict Accountability & Daily Briefing Card -->
+        <div class="glass-card rounded-2xl p-4 flex flex-col gap-2.5 flex-1">
+          <div class="flex items-center justify-between">
+            <h2 class="text-sm font-bold text-white">Strict Accountability Ledger</h2>
+            <span class="text-[11px] text-indigo-300 font-medium">Rules Active</span>
+          </div>
+          <div class="grid grid-cols-2 gap-2 text-xs">
+            <div class="rounded-xl bg-slate-950/70 border border-slate-800 p-2.5">
+              <div class="text-[10px] text-slate-400">On-Time Task</div>
+              <div class="text-emerald-400 font-bold mt-0.5">+25 XP</div>
+            </div>
+            <div class="rounded-xl bg-slate-950/70 border border-slate-800 p-2.5">
+              <div class="text-[10px] text-slate-400">Skip Penalty</div>
+              <div class="text-rose-400 font-bold mt-0.5">-20 XP &amp; 0d Streak</div>
+            </div>
+            <div class="rounded-xl bg-slate-950/70 border border-slate-800 p-2.5">
+              <div class="text-[10px] text-slate-400">Snooze #1 / #2</div>
+              <div class="text-amber-300 font-bold mt-0.5">Free / -5 XP Tax</div>
+            </div>
+            <div class="rounded-xl bg-slate-950/70 border border-slate-800 p-2.5">
+              <div class="text-[10px] text-slate-400">Snooze #3 Lock</div>
+              <div class="text-cyan-300 font-bold mt-0.5">Requires 2m Step</div>
+            </div>
+          </div>
+        </div>
+
+      </section>
+    </div>
+  </main>
+
+  <!-- Nudge Decision Modal (User Final Judgment + Progressive Snooze Tax) -->
+  <div id="nudgeModal" class="hidden fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="glass-card rounded-2xl max-w-md w-full p-5 flex flex-col gap-4 shadow-2xl border border-indigo-500/40">
+      <div class="flex items-center justify-between">
+        <span class="text-xs font-bold uppercase tracking-wider px-2.5 py-1 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+          Secretary Nudge — Your Call
+        </span>
+        <button id="btnCloseNudge" type="button" class="text-slate-400 hover:text-white text-lg leading-none">&times;</button>
+      </div>
+
+      <div>
+        <h3 id="nudgeTaskTitle" class="text-base font-bold text-white">Scheduled Task</h3>
+        <p id="nudgeTaskMeta" class="text-xs text-slate-400 mt-1"></p>
+      </div>
+
+      <div id="nudgeSnoozeRuleBox" class="rounded-xl bg-slate-900/90 border border-slate-800 p-3 text-xs text-slate-300 leading-relaxed"></div>
+
+      <div class="flex flex-col gap-2">
+        <button id="btnNudgeStartNow" type="button" class="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-xs font-bold text-white transition shadow">
+          ▶ Start Now (+5 Bonus XP &amp; Focus Timer)
+        </button>
+
+        <div id="nudgeRescheduleRow" class="flex gap-2">
+          <input id="nudgeNewTimeInput" type="time" class="rounded-xl bg-slate-950 border border-slate-700 px-3 py-2 text-xs text-white outline-none" />
+          <button id="btnNudgeDoLater" type="button" class="flex-1 py-2 rounded-xl bg-amber-600/25 hover:bg-amber-600/35 border border-amber-500/40 text-xs font-semibold text-amber-200 transition">
+            Do Later (Reschedule)
+          </button>
+        </div>
+
+        <button id="btnNudgeMicroStep" type="button" class="hidden w-full py-2 rounded-xl bg-cyan-600/25 hover:bg-cyan-600/35 border border-cyan-500/40 text-xs font-semibold text-cyan-200 transition">
+          ⚡ Do 2-Min Micro-Step First (Unlocks Reschedule)
+        </button>
+
+        <button id="btnNudgeSkip" type="button" class="w-full py-2 rounded-xl bg-rose-600/20 hover:bg-rose-600/30 border border-rose-500/30 text-xs font-semibold text-rose-300 transition">
+          ✕ Skip Task (-20 XP &amp; Reset Streak)
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Timetable & Sleep Cutoff Modal -->
+  <div id="timetableModal" class="hidden fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="glass-card rounded-2xl max-w-lg w-full p-5 flex flex-col gap-4 shadow-2xl border border-slate-700">
+      <div class="flex items-center justify-between">
+        <div>
+          <h3 class="text-base font-bold text-white">General Weekly Timetable &amp; Sleep Cutoff</h3>
+          <p class="text-xs text-slate-400">Locked blocks are respected automatically unless overridden</p>
+        </div>
+        <button id="btnCloseTimetable" type="button" class="text-slate-400 hover:text-white text-lg leading-none">&times;</button>
+      </div>
+
+      <div class="flex items-center justify-between bg-slate-900/90 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs">
+        <label for="sleepCutoffInput" class="text-slate-300 font-medium">Target Sleep / End-of-Day Cutoff:</label>
+        <input id="sleepCutoffInput" type="time" value="23:30" class="rounded-lg bg-slate-950 border border-slate-700 px-2.5 py-1 text-xs text-white outline-none" />
+      </div>
+
+      <form id="addTimetableSlotForm" class="grid grid-cols-1 sm:grid-cols-5 gap-2 bg-slate-900/60 p-2.5 rounded-xl border border-slate-800 text-xs">
+        <select id="ttDayInput" class="rounded-lg bg-slate-950 border border-slate-700 px-2 py-1.5 text-white outline-none">
+          <option value="Weekdays">Mon–Fri</option>
+          <option value="Monday">Monday</option>
+          <option value="Tuesday">Tuesday</option>
+          <option value="Wednesday">Wednesday</option>
+          <option value="Thursday">Thursday</option>
+          <option value="Friday">Friday</option>
+          <option value="Saturday">Saturday</option>
+        </select>
+        <input id="ttTitleInput" type="text" required placeholder="Block (e.g., Morning Classes)" class="sm:col-span-2 rounded-lg bg-slate-950 border border-slate-700 px-2.5 py-1.5 text-white outline-none" />
+        <div class="flex gap-1">
+          <input id="ttStartInput" type="time" value="09:00" required class="w-full rounded-lg bg-slate-950 border border-slate-700 px-1.5 py-1.5 text-white outline-none" />
+          <input id="ttEndInput" type="time" value="13:00" required class="w-full rounded-lg bg-slate-950 border border-slate-700 px-1.5 py-1.5 text-white outline-none" />
+        </div>
+        <button type="submit" class="rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-1.5">+ Lock</button>
+      </form>
+
+      <div id="timetableSlotsList" class="flex flex-col gap-1.5 max-h-56 overflow-y-auto pr-1 text-xs"></div>
+    </div>
+  </div>
+
+  <!-- Sync & GitHub Modal (Offline Sync Code + Schema Migration Info) -->
+  <div id="syncModal" class="hidden fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="glass-card rounded-2xl max-w-lg w-full p-5 flex flex-col gap-4 shadow-2xl border border-slate-700">
+      <div class="flex items-center justify-between">
+        <div>
+          <h3 class="text-base font-bold text-white">Offline Phone ↔ Laptop Sync &amp; GitHub</h3>
+          <p class="text-xs text-slate-400">Zero-data-loss schema v2.0 • No cloud server required</p>
+        </div>
+        <button id="btnCloseSync" type="button" class="text-slate-400 hover:text-white text-lg leading-none">&times;</button>
+      </div>
+
+      <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-3.5 flex flex-col gap-2.5 text-xs">
+        <div class="flex items-center justify-between">
+          <span class="font-semibold text-cyan-300">1-Tap Instant Sync String (Phone ↔ Laptop)</span>
+          <button id="btnCopySyncCode" type="button" class="px-2.5 py-1 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-semibold">Copy My Sync Code</button>
+        </div>
+        <textarea id="syncCodeTextarea" rows="3" placeholder="Paste a Sync Code from your other device here to merge schedule, goals, XP &amp; timetable..." class="w-full rounded-lg bg-slate-950 border border-slate-700 p-2 text-[11px] text-slate-200 font-mono outline-none"></textarea>
+        <div class="flex justify-end">
+          <button id="btnApplySyncCode" type="button" class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold">Merge Sync Code</button>
+        </div>
+      </div>
+
+      <div class="bg-slate-900/60 border border-slate-800 rounded-xl p-3.5 text-xs text-slate-300 space-y-1.5 leading-relaxed">
+        <div class="font-semibold text-white">How Zero-Data-Loss Upgrades &amp; GitHub Pages Work:</div>
+        <p>• <strong>Safe for Public GitHub:</strong> Your API key and schedule live only in your device's local browser storage (`pulsedesk_secretary_v1`), never in the HTML code.</p>
+        <p>• <strong>Automatic Schema Migration:</strong> When you push new code updates to GitHub Pages, the startup migrator upgrades your saved state in place without losing tasks, streaks, or XP.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings Modal (Gemini API + JSON Backup) -->
+  <div id="settingsModal" class="hidden fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="glass-card rounded-2xl max-w-md w-full p-5 flex flex-col gap-4 shadow-2xl border border-slate-700">
+      <div class="flex items-center justify-between">
+        <h3 class="text-base font-bold text-white">Gemini Agent &amp; Backup Settings</h3>
+        <button id="btnCloseSettings" type="button" class="text-slate-400 hover:text-white text-lg leading-none">&times;</button>
+      </div>
+
+      <p class="text-xs text-slate-300 leading-relaxed">
+        Connect your API key from <strong class="text-cyan-300">Google AI Studio</strong> (<code class="text-slate-400">aistudio.google.com/api-keys</code>). Stored strictly on your local device so the app is 100% safe to upload to GitHub.
+      </p>
+
+      <div class="flex flex-col gap-3">
+        <div>
+          <label for="apiKeyInput" class="text-xs font-medium text-slate-300 block mb-1">Gemini API Key</label>
+          <input id="apiKeyInput" type="password" placeholder="AIza..." class="w-full rounded-xl bg-slate-950 border border-slate-700 px-3 py-2 text-xs text-white outline-none focus:border-indigo-500" />
+        </div>
+
+        <div>
+          <div class="flex items-center justify-between mb-1">
+            <label for="modelSelect" class="text-xs font-medium text-slate-300">Model</label>
+            <button id="btnFetchModels" type="button" class="text-[11px] text-cyan-400 hover:underline">Fetch My Models</button>
+          </div>
+          <select id="modelSelect" class="w-full rounded-xl bg-slate-950 border border-slate-700 px-3 py-2 text-xs text-white outline-none focus:border-indigo-500">
+            <option value="gemini-3.8-flash">gemini-3.8-flash (Recommended)</option>
+            <option value="gemini-3.5-flash-lite">gemini-3.5-flash-lite (Fastest)</option>
+            <option value="gemini-4-hydrogen">gemini-4-hydrogen (Deep Reasoning)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="border-t border-slate-800 pt-3 flex flex-wrap items-center justify-between gap-2">
+        <div class="flex gap-2">
+          <button id="btnExportData" type="button" class="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs text-slate-200 border border-slate-700">Export JSON</button>
+          <label class="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs text-slate-200 border border-slate-700 cursor-pointer">
+            Import JSON
+            <input id="importFileInput" type="file" accept=".json" class="hidden" />
+          </label>
+        </div>
+        <button id="btnSaveSettings" type="button" class="px-4 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-xs font-semibold text-white">Save Settings</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      const STORAGE_KEY = 'pulsedesk_secretary_v1';
+      const CURRENT_SCHEMA_VERSION = 2;
+
+      function pad(n) {
+        return String(n).padStart(2, '0');
+      }
+
+      function timeToMins(t) {
+        if (!t || !/^\d{2}:\d{2}$/.test(t)) return 0;
+        const [h, m] = t.split(':').map(Number);
+        return h * 60 + m;
+      }
+
+      function minsToTime(totalMins) {
+        const clamped = ((totalMins % 1440) + 1440) % 1440;
+        return pad(Math.floor(clamped / 60)) + ':' + pad(clamped % 60);
+      }
+
+      function getCurrentHHMM() {
+        const d = new Date();
+        return pad(d.getHours()) + ':' + pad(d.getMinutes());
+      }
+
+      function getTodayDateString() {
+        const d = new Date();
+        return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+      }
+
+      function getNextSlotHHMM(offsetMins = 15) {
+        const d = new Date(Date.now() + offsetMins * 60000);
+        const mins = Math.ceil(d.getMinutes() / 5) * 5;
+        d.setMinutes(mins, 0, 0);
+        return pad(d.getHours()) + ':' + pad(d.getMinutes());
+      }
+
+      // General, GitHub-safe default state
+      const defaultState = {
+        schemaVersion: CURRENT_SCHEMA_VERSION,
+        apiKey: '',
+        model: 'gemini-3.8-flash',
+        xp: 100,
+        focusMinutesToday: 0,
+        streakDays: 1,
+        lowEnergyCharges: 2,
+        lowEnergyActiveToday: false,
+        learningStyle: 'video',
+        paceMultiplier: 1.0,
+        sleepCutoff: '23:30',
+        dayMode: 'normal',
+        filter: 'all',
+        pinnedTaskId: null,
+        timetable: [
+          { id: 'tt1', day: 'Weekdays', title: 'Core Classes / Lectures', start: '09:30', end: '13:00' },
+          { id: 'tt2', day: 'Weekdays', title: 'Afternoon Lab / Practical Block', start: '14:00', end: '16:30' },
+          { id: 'tt3', day: 'Friday', title: 'Friday Short Session', start: '10:00', end: '12:30' }
+        ],
+        tasks: [
+          {
+            id: 't1',
+            title: 'Watch 20m x86 Bootloader Intro Video & list 3 CPU registers',
+            time: getNextSlotHHMM(15),
+            duration: 25,
+            category: 'Study',
+            deadline: getTodayDateString(),
+            snoozeCount: 0,
+            microStepUnlocked: false,
+            remind: true,
+            reminded: false,
+            done: false
+          },
+          {
+            id: 't2',
+            title: '25-min Bodyweight Calisthenics (Push-ups, Squats, Planks)',
+            time: getNextSlotHHMM(60),
+            duration: 25,
+            category: 'Fitness',
+            deadline: getTodayDateString(),
+            snoozeCount: 0,
+            microStepUnlocked: false,
+            remind: true,
+            reminded: false,
+            done: false
+          },
+          {
+            id: 't3',
+            title: 'Hydration & 5-Min Mobility Stretch',
+            time: getNextSlotHHMM(95),
+            duration: 10,
+            category: 'Health',
+            deadline: getTodayDateString(),
+            snoozeCount: 0,
+            microStepUnlocked: false,
+            remind: true,
+            reminded: false,
+            done: false
+          }
+        ],
+        goals: [
+          {
+            id: 'g1',
+            title: 'Develop My Own OS (From Scratch)',
+            dailyStep: 'Watch 20m Bootloader Video & run minimal QEMU boot sector',
+            baseMinutes: 25,
+            deadline: '',
+            category: 'Study',
+            completedCount: 1,
+            targetCount: 10,
+            roadmap: [
+              'Step 1: Watch 20m Real-Mode & BIOS Boot Sector tutorial + 3 bullet notes',
+              'Step 2: Write 512-byte boot.asm with 0xAA55 magic number & boot in QEMU (25m)',
+              'Step 3: Print "Hello OS" using BIOS interrupt 0x10 teletype (25m)',
+              'Step 4: Read GDT (Global Descriptor Table) overview & 32-bit Protected Mode switch (30m)'
+            ]
+          },
+          {
+            id: 'g2',
+            title: 'Build a Fit Body & Consistent Strength',
+            dailyStep: '25-min Structured Bodyweight Workout + Hydration Check',
+            baseMinutes: 25,
+            deadline: '',
+            category: 'Fitness',
+            completedCount: 2,
+            targetCount: 7,
+            roadmap: [
+              'Step 1: 3x10 Push-ups, 3x12 Bodyweight Squats & 60s Plank (25m)',
+              'Step 2: Pull/Row Progression + Core Leg Raises & Protein Check (25m)',
+              'Step 3: Active Mobility & 8,000+ Step Target Check-in (20m)'
+            ]
+          }
+        ],
+        logs: [
+          {
+            role: 'agent',
+            text: "PulseDesk v2.0 active (Zero-Data-Loss Schema). Your fixed timetable, Hangout Point-of-No-Return calculator, Progressive Snooze Tax, and Learning Pace Engine are ready.",
+            time: getCurrentHHMM()
+          }
+        ]
+      };
+
+      // Versioned State Migration Engine (Zero Data Loss across upgrades)
+      function migrateAndLoadState() {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEY);
+          if (!raw) return JSON.parse(JSON.stringify(defaultState));
+          const saved = JSON.parse(raw);
+          const merged = Object.assign(JSON.parse(JSON.stringify(defaultState)), saved);
+
+          // Ensure all tasks have v2 fields without losing v1 tasks
+          merged.tasks = (merged.tasks || []).map(t => Object.assign({
+            deadline: getTodayDateString(),
+            snoozeCount: 0,
+            microStepUnlocked: false,
+            remind: true,
+            reminded: false,
+            done: false
+          }, t));
+
+          // Ensure all goals have v2 fields
+          merged.goals = (merged.goals || []).map(g => Object.assign({
+            baseMinutes: 25,
+            deadline: '',
+            roadmap: [g.dailyStep || 'Complete 25-min focused session']
+          }, g));
+
+          if (!Array.isArray(merged.timetable)) {
+            merged.timetable = JSON.parse(JSON.stringify(defaultState.timetable));
+          }
+
+          merged.schemaVersion = CURRENT_SCHEMA_VERSION;
+          return merged;
+        } catch (e) {
+          return JSON.parse(JSON.stringify(defaultState));
+        }
+      }
+
+      function saveState() {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        } catch (e) {}
+      }
+
+      let state = migrateAndLoadState();
+      saveState();
+
+      // Runtime Timers & Modals State
+      let timerInterval = null;
+      let timerRemainingSec = 25 * 60;
+      let timerTotalSec = 25 * 60;
+      let timerRunning = false;
+      let timerIsMicroStepForTaskId = null;
+
+      let hangoutInterval = null;
+      let hangoutRemainingSec = 0;
+
+      let activeNudgeTaskId = null;
+      let lastCompletedTaskId = null;
+      let recognition = null;
+      let isListening = false;
+
+      // DOM Elements
+      const toastContainer = document.getElementById('toastContainer');
+      const connectionBadge = document.getElementById('connectionBadge');
+      const liveClockLabel = document.getElementById('liveClockLabel');
+      const statXP = document.getElementById('statXP');
+      const statLevel = document.getElementById('statLevel');
+      const statDone = document.getElementById('statDone');
+      const statFocus = document.getElementById('statFocus');
+      const statStreak = document.getElementById('statStreak');
+      const lowEnergyChargesLabel = document.getElementById('lowEnergyChargesLabel');
+      const btnLowEnergyMode = document.getElementById('btnLowEnergyMode');
+      const learningStyleSelect = document.getElementById('learningStyleSelect');
+      const paceMultiplierLabel = document.getElementById('paceMultiplierLabel');
+      const dayModeSelect = document.getElementById('dayModeSelect');
+      const freeSlotsSummary = document.getElementById('freeSlotsSummary');
+      const paceCalibrationBanner = document.getElementById('paceCalibrationBanner');
+      const agentInput = document.getElementById('agentInput');
+      const btnMic = document.getElementById('btnMic');
+      const btnMicText = document.getElementById('btnMicText');
+      const micStatus = document.getElementById('micStatus');
+      const btnSendAgent = document.getElementById('btnSendAgent');
+      const scheduleList = document.getElementById('scheduleList');
+      const goalsList = document.getElementById('goalsList');
+      const agentLog = document.getElementById('agentLog');
+      const addTaskForm = document.getElementById('addTaskForm');
+      const addGoalForm = document.getElementById('addGoalForm');
+      const timerDisplay = document.getElementById('timerDisplay');
+      const btnTimerToggle = document.getElementById('btnTimerToggle');
+      const timerModeBadge = document.getElementById('timerModeBadge');
+      const focusActiveTaskLabel = document.getElementById('focusActiveTaskLabel');
+      const hangoutTimerDisplay = document.getElementById('hangoutTimerDisplay');
+      const ponrBadge = document.getElementById('ponrBadge');
+      const ponrExplanation = document.getElementById('ponrExplanation');
+
+      // Modals
+      const settingsModal = document.getElementById('settingsModal');
+      const timetableModal = document.getElementById('timetableModal');
+      const syncModal = document.getElementById('syncModal');
+      const nudgeModal = document.getElementById('nudgeModal');
+      const apiKeyInput = document.getElementById('apiKeyInput');
+      const modelSelect = document.getElementById('modelSelect');
+
+      function escapeHtml(str) {
+        return String(str || '')
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;');
+      }
+
+      function playChime() {
+        try {
+          const ctx = new (window.AudioContext || window.webkitAudioContext)();
+          const now = ctx.currentTime;
+          [523.25, 659.25, 783.99].forEach((freq, idx) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(freq, now + idx * 0.12);
+            gain.gain.setValueAtTime(0.08, now + idx * 0.12);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.12 + 0.35);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(now + idx * 0.12);
+            osc.stop(now + idx * 0.12 + 0.36);
+          });
+        } catch (e) {}
+      }
+
+      function showToast(title, body, tone = 'info') {
+        const colors = {
+          info: 'border-indigo-500/50 bg-slate-900/95 text-slate-100',
+          success: 'border-emerald-500/50 bg-slate-900/95 text-emerald-100',
+          warn: 'border-amber-500/50 bg-slate-900/95 text-amber-100',
+          error: 'border-rose-500/50 bg-slate-900/95 text-rose-100'
+        };
+        const el = document.createElement('div');
+        el.className = `pointer-events-auto rounded-xl border px-3.5 py-2.5 shadow-xl text-xs transition-all ${colors[tone] || colors.info}`;
+        el.innerHTML = `<div class="font-semibold">${escapeHtml(title)}</div><div class="text-slate-300 mt-0.5">${escapeHtml(body)}</div>`;
+        toastContainer.appendChild(el);
+        setTimeout(() => {
+          el.style.opacity = '0';
+          setTimeout(() => el.remove(), 300);
+        }, 4500);
+      }
+
+      function categoryStyle(cat) {
+        const map = {
+          Fitness: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
+          Study: 'bg-indigo-500/15 text-indigo-300 border-indigo-500/30',
+          Health: 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30',
+          Focus: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
+          Personal: 'bg-purple-500/15 text-purple-300 border-purple-500/30',
+          Locked: 'bg-slate-700/40 text-slate-300 border-slate-600/50'
+        };
+        return map[cat] || map.Personal;
+      }
+
+      // Active Locked Timetable Blocks for Today based on Day-Mode Override
+      function getActiveTimetableBlocks() {
+        const mode = state.dayMode || 'normal';
+        if (mode === 'exam' || mode === 'holiday') return [];
+        const weekdayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        const effectiveDay = mode === 'friday' ? 'Friday' : mode === 'Monday' ? 'Monday' : weekdayNames[new Date().getDay()];
+        const isWeekday = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'].includes(effectiveDay);
+
+        return (state.timetable || []).filter(slot => {
+          if (slot.day === effectiveDay) return true;
+          if (slot.day === 'Weekdays' && isWeekday && effectiveDay !== 'Friday') return true;
+          return false;
+        });
+      }
+
+      // Find next open slot avoiding both Locked Timetable blocks and Pending Tasks
+      function findNextOpenSlot(durationMins = 25, startAfterHHMM = null) {
+        const nowMins = startAfterHHMM ? timeToMins(startAfterHHMM) : timeToMins(getCurrentHHMM()) + 10;
+        let candidate = Math.ceil(nowMins / 15) * 15;
+        const busyRanges = [];
+
+        getActiveTimetableBlocks().forEach(b => {
+          busyRanges.push([timeToMins(b.start), timeToMins(b.end)]);
+        });
+        state.tasks.filter(t => !t.done).forEach(t => {
+          const s = timeToMins(t.time);
+          busyRanges.push([s, s + (Number(t.duration) || 25)]);
+        });
+
+        const cutoffMins = timeToMins(state.sleepCutoff || '23:30');
+        for (let i = 0; i < 60; i++) {
+          const start = candidate + i * 15;
+          const end = start + durationMins;
+          if (end > cutoffMins) break;
+          const clash = busyRanges.some(([bs, be]) => start < be && end > bs);
+          if (!clash) return minsToTime(start);
+        }
+        return getNextSlotHHMM(20);
+      }
+
+      // Calculate Point of No Return (Latest time user must stop hanging out to finish pending tasks before sleep cutoff)
+      function computePointOfNoReturn() {
+        const sleepMins = timeToMins(state.sleepCutoff || '23:30');
+        const pendingMins = state.tasks
+          .filter(t => !t.done)
+          .reduce((acc, t) => acc + (Number(t.duration) || 20) + 5, 0); // +5m buffer per task
+        const ponrMins = Math.max(0, sleepMins - pendingMins);
+        return {
+          ponrHHMM: minsToTime(ponrMins),
+          pendingMins,
+          freeBufferMins: Math.max(0, ponrMins - timeToMins(getCurrentHHMM()))
+        };
+      }
+
+      function adjustXP(delta, reason) {
+        state.xp = Math.max(0, (Number(state.xp) || 0) + delta);
+        saveState();
+        renderHeader();
+        showToast(delta >= 0 ? `+${delta} XP Earned` : `${delta} XP Penalty`, reason, delta >= 0 ? 'success' : 'error');
+      }
+
+      function scaledDuration(baseMins) {
+        const mult = Number(state.paceMultiplier) || 1.0;
+        return Math.max(10, Math.round((Number(baseMins) || 25) * mult / 5) * 5);
+      }
+
+      function addTask({ title, time, duration = 25, category = 'Study', deadline = '', remind = true }) {
+        const dur = Number(duration) || 25;
+        const cleanTime = /^\d{2}:\d{2}$/.test(time || '') ? time : findNextOpenSlot(dur);
+        const task = {
+          id: 't_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+          title: title || 'Concrete Micro-Task',
+          time: cleanTime,
+          duration: dur,
+          category: category || 'Study',
+          deadline: deadline || getTodayDateString(),
+          snoozeCount: 0,
+          microStepUnlocked: false,
+          remind: remind !== false,
+          reminded: false,
+          done: false
+        };
+        state.tasks.push(task);
+        saveState();
+        renderAll();
+        return task;
+      }
+
+      function addGoal({ title, dailyStep, baseMinutes = 25, deadline = '', category = 'Study', roadmap = [] }) {
+        const steps = Array.isArray(roadmap) && roadmap.length > 0 ? roadmap : [
+          dailyStep || `20m ${state.learningStyle === 'video' ? 'Video tutorial + 3 notes' : 'Hands-on implementation'} on ${title}`,
+          `Build & test minimal prototype for ${title} (25m)`,
+          `Review & debug edge cases for ${title} (25m)`
+        ];
+        const goal = {
+          id: 'g_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+          title: title || 'New Goal',
+          dailyStep: steps[0],
+          baseMinutes: Number(baseMinutes) || 25,
+          deadline: deadline || '',
+          category: category || 'Study',
+          completedCount: 0,
+          targetCount: Math.max(5, steps.length * 2),
+          roadmap: steps
+        };
+        state.goals.push(goal);
+        saveState();
+        renderAll();
+        return goal;
+      }
+
+      function addLog(role, text) {
+        state.logs.push({ role, text, time: getCurrentHHMM() });
+        if (state.logs.length > 40) state.logs = state.logs.slice(-40);
+        saveState();
+        renderLog();
+      }
+
+      // Open Nudge Decision Modal (User Final Call + Progressive Snooze Tax)
+      function openNudgeModal(taskId) {
+        const task = state.tasks.find(t => t.id === taskId && !t.done);
+        if (!task) return;
+        activeNudgeTaskId = task.id;
+        const endHHMM = minsToTime(timeToMins(task.time) + (Number(task.duration) || 25));
+        document.getElementById('nudgeTaskTitle').textContent = task.title;
+        document.getElementById('nudgeTaskMeta').textContent = `Window: ${task.time} – ${endHHMM} (${task.duration}m) • Snoozes used: ${task.snoozeCount || 0}/2`;
+        document.getElementById('nudgeNewTimeInput').value = findNextOpenSlot(task.duration, minsToTime(timeToMins(getCurrentHHMM()) + 30));
+
+        const ruleBox = document.getElementById('nudgeSnoozeRuleBox');
+        const btnLater = document.getElementById('btnNudgeDoLater');
+        const btnMicro = document.getElementById('btnNudgeMicroStep');
+
+        if ((task.snoozeCount || 0) === 0) {
+          ruleBox.innerHTML = `<span class="text-emerald-300 font-semibold">1st Reschedule is FREE (0 XP cost).</span> You have final judgment—pick a realistic time slot if you're busy right now.`;
+          btnLater.disabled = false;
+          btnLater.classList.remove('opacity-40');
+          btnLater.textContent = 'Do Later (Free Reschedule)';
+          btnMicro.classList.add('hidden');
+        } else if (task.snoozeCount === 1) {
+          ruleBox.innerHTML = `<span class="text-amber-300 font-semibold">2nd Snooze Tax: -5 XP.</span> Rescheduling a second time costs 5 XP. Next snooze after this will require a 2-minute micro-step.`;
+          btnLater.disabled = false;
+          btnLater.classList.remove('opacity-40');
+          btnLater.textContent = 'Do Later (-5 XP Snooze Tax)';
+          btnMicro.classList.add('hidden');
+        } else if (!task.microStepUnlocked) {
+          ruleBox.innerHTML = `<span class="text-rose-300 font-semibold">3rd Snooze Locked!</span> To prevent infinite procrastination, complete a <strong>2-minute micro-step</strong> right now to unlock rescheduling, or accept a Skip (-20 XP).`;
+          btnLater.disabled = true;
+          btnLater.classList.add('opacity-40');
+          btnLater.textContent = 'Locked (Run 2m Step Below)';
+          btnMicro.classList.remove('hidden');
+        } else {
+          ruleBox.innerHTML = `<span class="text-cyan-300 font-semibold">Micro-Step Completed!</span> You unlocked a penalty-free reschedule for the rest of this task.`;
+          btnLater.disabled = false;
+          btnLater.classList.remove('opacity-40');
+          btnLater.textContent = 'Do Later (Unlocked)';
+          btnMicro.classList.add('hidden');
+        }
+
+        nudgeModal.classList.remove('hidden');
+      }
+
+      // Render Functions
+      function renderHeader() {
+        const doneCount = state.tasks.filter(t => t.done).length;
+        const level = Math.max(1, Math.floor((Number(state.xp) || 0) / 100) + 1);
+        statXP.textContent = state.xp;
+        statLevel.textContent = `(Lv.${level})`;
+        statDone.textContent = `${doneCount}/${state.tasks.length}`;
+        statFocus.textContent = `${state.focusMinutesToday}m`;
+        statStreak.textContent = `${state.streakDays}d`;
+        lowEnergyChargesLabel.textContent = `${state.lowEnergyCharges}/2`;
+        learningStyleSelect.value = state.learningStyle || 'video';
+        paceMultiplierLabel.textContent = `${Number(state.paceMultiplier || 1).toFixed(2)}x`;
+        dayModeSelect.value = state.dayMode || 'normal';
+
+        const ponr = computePointOfNoReturn();
+        ponrBadge.textContent = `Point of No Return: ${ponr.ponrHHMM}`;
+        ponrExplanation.textContent = `With ${ponr.pendingMins}m of pending tasks before your ${state.sleepCutoff} cutoff, you have ~${ponr.freeBufferMins}m of flexible hangout/free buffer left today.`;
+        freeSlotsSummary.textContent = `Next open gap: ${findNextOpenSlot(25)}`;
+
+        if (state.apiKey && state.apiKey.trim().length > 10) {
+          connectionBadge.textContent = `Gemini (${state.model})`;
+          connectionBadge.className = 'text-[11px] font-medium px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30';
+        } else {
+          connectionBadge.textContent = 'Offline Agent';
+          connectionBadge.className = 'text-[11px] font-medium px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30';
+        }
+      }
+
+      function renderSchedule() {
+        const lockedBlocks = getActiveTimetableBlocks().map(b => ({
+          id: b.id,
+          isLockedBlock: true,
+          title: b.title,
+          time: b.start,
+          endTime: b.end,
+          category: 'Locked'
+        }));
+
+        // Priority sort: sort by time, with deadline urgency badge
+        const combined = [
+          ...(state.filter === 'done' ? [] : lockedBlocks),
+          ...state.tasks.filter(t => {
+            if (state.filter === 'pending') return !t.done;
+            if (state.filter === 'done') return t.done;
+            return true;
+          })
+        ].sort((a, b) => a.time.localeCompare(b.time));
+
+        if (combined.length === 0) {
+          scheduleList.innerHTML = `<div class="text-xs text-slate-500 text-center py-8 border border-dashed border-slate-800 rounded-xl">No items in this view. Add a task or dictate a goal above.</div>`;
+          return;
+        }
+
+        scheduleList.innerHTML = combined.map(item => {
+          if (item.isLockedBlock) {
+            return `
+              <div class="rounded-xl border border-slate-800/90 bg-slate-950/60 px-3 py-2.5 flex items-center justify-between gap-2">
+                <div class="flex items-center gap-2.5">
+                  <span class="text-xs font-semibold text-slate-400 tabular-nums">${escapeHtml(item.time)} – ${escapeHtml(item.endTime)}</span>
+                  <span class="text-[10px] px-1.5 py-0.5 rounded border ${categoryStyle('Locked')}">🔒 Timetable</span>
+                  <span class="text-xs font-medium text-slate-300">${escapeHtml(item.title)}</span>
+                </div>
+              </div>
+            `;
+          }
+
+          const t = item;
+          const isPinned = state.pinnedTaskId === t.id;
+          const endHHMM = minsToTime(timeToMins(t.time) + (Number(t.duration) || 25));
+          return `
+            <div class="rounded-xl border ${t.done ? 'border-slate-800/60 bg-slate-900/40 opacity-65' : isPinned ? 'border-cyan-500/50 bg-slate-900/95' : 'border-slate-800 bg-slate-900/80'} p-3 flex items-start justify-between gap-2.5 transition">
+              <div class="flex items-start gap-2.5 min-w-0">
+                <button type="button" data-action="toggle-task" data-id="${t.id}" class="mt-0.5 w-4 h-4 rounded border ${t.done ? 'bg-emerald-500 border-emerald-500 text-slate-950' : 'border-slate-600 hover:border-indigo-400'} flex items-center justify-center shrink-0 transition" title="Complete task (+25 XP)">
+                  ${t.done ? '<svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>' : ''}
+                </button>
+                <div class="min-w-0">
+                  <div class="flex flex-wrap items-center gap-1.5">
+                    <span class="text-xs font-semibold text-indigo-300 tabular-nums">${escapeHtml(t.time)} – ${escapeHtml(endHHMM)}</span>
+                    <span class="text-[10px] px-1.5 py-0.5 rounded border ${categoryStyle(t.category)}">${escapeHtml(t.category)}</span>
+                    <span class="text-[10px] text-slate-400">${t.duration}m</span>
+                    ${t.deadline ? `<span class="text-[10px] px-1.5 py-0.2 rounded bg-rose-500/10 text-rose-300 border border-rose-500/20">Due ${escapeHtml(t.deadline)}</span>` : ''}
+                    ${t.snoozeCount > 0 ? `<span class="text-[10px] text-amber-300">Snoozed ${t.snoozeCount}x</span>` : ''}
+                  </div>
+                  <p class="text-xs sm:text-sm font-medium mt-1 ${t.done ? 'line-through text-slate-500' : 'text-slate-100'}">${escapeHtml(t.title)}</p>
+                </div>
+              </div>
+              <div class="flex items-center gap-1 shrink-0">
+                ${!t.done ? `
+                  <button type="button" data-action="nudge-task" data-id="${t.id}" class="px-2 py-1 rounded-lg text-[11px] bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 transition" title="Reschedule or Decide">Decide</button>
+                  <button type="button" data-action="pin-task" data-id="${t.id}" class="px-2 py-1 rounded-lg text-[11px] ${isPinned ? 'bg-cyan-600 text-white' : 'bg-slate-800 hover:bg-slate-700 text-cyan-300'} transition">Focus</button>
+                ` : ''}
+                <button type="button" data-action="delete-task" data-id="${t.id}" class="p-1 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-slate-800 transition" title="Delete">&times;</button>
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+
+      function renderGoals() {
+        if (state.goals.length === 0) {
+          goalsList.innerHTML = `<div class="text-xs text-slate-500 text-center py-8 border border-dashed border-slate-800 rounded-xl">No active goals yet. Dictate or add a goal above!</div>`;
+          return;
+        }
+        goalsList.innerHTML = state.goals.map(g => {
+          const pct = Math.min(100, Math.round((g.completedCount / (g.targetCount || 1)) * 100));
+          const adjMins = scaledDuration(g.baseMinutes || 25);
+          const nextSlot = findNextOpenSlot(adjMins);
+          const nextEnd = minsToTime(timeToMins(nextSlot) + adjMins);
+          const stepsHtml = (g.roadmap || []).slice(0, 3).map((s, idx) =>
+            `<div class="text-[11px] text-slate-400 truncate">${idx === 0 ? '👉 ' : '• '}${escapeHtml(s)}</div>`
+          ).join('');
+
+          return `
+            <div class="rounded-xl border border-slate-800 bg-slate-900/80 p-3 flex flex-col gap-2">
+              <div class="flex items-start justify-between gap-2">
+                <div class="min-w-0">
+                  <div class="flex items-center gap-1.5">
+                    <span class="text-[10px] px-1.5 py-0.5 rounded border ${categoryStyle(g.category)}">${escapeHtml(g.category)}</span>
+                    <span class="text-[10px] text-emerald-300 font-medium">${adjMins}m (Pace-adjusted)</span>
+                  </div>
+                  <h3 class="text-xs sm:text-sm font-semibold text-white mt-1">${escapeHtml(g.title)}</h3>
+                </div>
+                <button type="button" data-action="delete-goal" data-id="${g.id}" class="text-slate-500 hover:text-rose-400 text-sm px-1">&times;</button>
+              </div>
+              <div class="bg-slate-950/70 rounded-lg p-2 border border-slate-800/80 flex flex-col gap-1">
+                ${stepsHtml}
+              </div>
+              <div class="w-full bg-slate-950 rounded-full h-1.5 overflow-hidden border border-slate-800">
+                <div class="bg-gradient-to-r from-emerald-500 to-cyan-400 h-full transition-all" style="width: ${pct}%"></div>
+              </div>
+              <div class="flex items-center justify-between text-[11px] text-slate-400">
+                <span>${g.completedCount}/${g.targetCount} done</span>
+                <button type="button" data-action="schedule-goal" data-id="${g.id}" class="px-2.5 py-1 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 font-medium transition">
+                  + Slot ${nextSlot}–${nextEnd}
+                </button>
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+
+      function renderTimetableModal() {
+        document.getElementById('sleepCutoffInput').value = state.sleepCutoff || '23:30';
+        const container = document.getElementById('timetableSlotsList');
+        if (!state.timetable || state.timetable.length === 0) {
+          container.innerHTML = `<div class="text-slate-500 text-center py-4">No fixed blocks added.</div>`;
+          return;
+        }
+        container.innerHTML = state.timetable.map(slot => `
+          <div class="flex items-center justify-between bg-slate-900 border border-slate-800 rounded-lg px-3 py-2">
+            <div>
+              <span class="font-semibold text-indigo-300">${escapeHtml(slot.day)}</span>
+              <span class="text-slate-400 mx-1">•</span>
+              <span class="text-slate-200 tabular-nums">${escapeHtml(slot.start)}–${escapeHtml(slot.end)}</span>
+              <span class="text-slate-300 ml-2">${escapeHtml(slot.title)}</span>
+            </div>
+            <button type="button" data-tt-delete="${slot.id}" class="text-slate-500 hover:text-rose-400 font-bold px-1">&times;</button>
+          </div>
+        `).join('');
+      }
+
+      function renderFocusLabel() {
+        const pinned = state.tasks.find(t => t.id === state.pinnedTaskId && !t.done);
+        focusActiveTaskLabel.textContent = pinned ? `Pinned: ${pinned.title}` : 'No task pinned — pick one or start 2-min rule';
+      }
+
+      let voiceReplyEnabled = false;
+      function speakSecretaryReply(text) {
+        if (!voiceReplyEnabled || !('speechSynthesis' in window)) return;
+        try {
+          window.speechSynthesis.cancel();
+          const utter = new SpeechSynthesisUtterance(text);
+          utter.rate = 1.05;
+          window.speechSynthesis.speak(utter);
+        } catch (e) {}
+      }
+
+      function renderSecretaryChips() {
+        const chipBox = document.getElementById('secretaryActionChips');
+        if (!chipBox) return;
+        const nextTask = state.tasks.find(t => !t.done);
+        const chips = [];
+        if (nextTask) {
+          chips.push({ label: `▶ Start "${nextTask.title.slice(0, 24)}..."`, cmd: `Start my next task now` });
+          chips.push({ label: `✅ Mark "${nextTask.title.slice(0, 20)}..." Done`, cmd: `I finished my current task` });
+          chips.push({ label: `⏭ Snooze Next Task 30m`, cmd: `Snooze my next task by 30 minutes` });
+        }
+        chips.push({ label: `🕒 Hangout 60m`, cmd: `I am hanging out for 60 minutes` });
+        if (!state.lowEnergyActiveToday && state.lowEnergyCharges > 0) {
+          chips.push({ label: `⚡ Low-Energy Day (${state.lowEnergyCharges} left)`, cmd: `Activate low energy mode for today` });
+        }
+        chipBox.innerHTML = chips.map(c =>
+          `<button type="button" data-sec-cmd="${escapeHtml(c.cmd)}" class="px-2.5 py-1 rounded-lg bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-200 border border-indigo-500/30 text-[11px] font-medium transition">${escapeHtml(c.label)}</button>`
+        ).join('');
+      }
+
+      function renderLog() {
+        agentLog.innerHTML = state.logs.map(entry => {
+          const isUser = entry.role === 'user';
+          return `
+            <div class="flex flex-col ${isUser ? 'items-end' : 'items-start'}">
+              <div class="max-w-[92%] rounded-xl px-3 py-2 ${isUser ? 'bg-indigo-600 text-white' : 'bg-slate-800/90 text-slate-200 border border-slate-700/70'}">
+                <p class="leading-relaxed whitespace-pre-wrap">${escapeHtml(entry.text)}</p>
+              </div>
+              <span class="text-[10px] text-slate-500 mt-0.5 px-1">${isUser ? 'You' : 'Secretary'} • ${escapeHtml(entry.time)}</span>
+            </div>
+          `;
+        }).join('');
+        agentLog.scrollTop = agentLog.scrollHeight;
+        renderSecretaryChips();
+      }
+
+      function renderAll() {
+        renderHeader();
+        renderSchedule();
+        renderGoals();
+        renderFocusLabel();
+        renderLog();
+      }
+
+      // Focus Timer Logic
+      function updateTimerDisplay() {
+        const mins = Math.floor(timerRemainingSec / 60);
+        const secs = timerRemainingSec % 60;
+        timerDisplay.textContent = `${pad(mins)}:${pad(secs)}`;
+      }
+
+      function setTimerPreset(mins, label, unlockTaskId = null) {
+        clearInterval(timerInterval);
+        timerRunning = false;
+        btnTimerToggle.textContent = 'Start';
+        timerTotalSec = mins * 60;
+        timerRemainingSec = mins * 60;
+        timerIsMicroStepForTaskId = unlockTaskId;
+        timerModeBadge.textContent = label;
+        updateTimerDisplay();
+      }
+
+      function toggleTimer() {
+        if (timerRunning) {
+          clearInterval(timerInterval);
+          timerRunning = false;
+          btnTimerToggle.textContent = 'Resume';
+        } else {
+          timerRunning = true;
+          btnTimerToggle.textContent = 'Pause';
+          timerInterval = setInterval(() => {
+            timerRemainingSec--;
+            updateTimerDisplay();
+            if (timerRemainingSec <= 0) {
+              clearInterval(timerInterval);
+              timerRunning = false;
+              btnTimerToggle.textContent = 'Start';
+              const earnedMins = Math.max(1, Math.round(timerTotalSec / 60));
+              state.focusMinutesToday += earnedMins;
+
+              if (timerIsMicroStepForTaskId) {
+                const unlockedTask = state.tasks.find(t => t.id === timerIsMicroStepForTaskId);
+                if (unlockedTask) {
+                  unlockedTask.microStepUnlocked = true;
+                  adjustXP(10, `Completed 2-min Micro-Step for "${unlockedTask.title}"! Reschedule unlocked.`);
+                }
+                timerIsMicroStepForTaskId = null;
+              } else {
+                adjustXP(15, `Completed ${earnedMins}m Focus Block`);
+              }
+
+              saveState();
+              renderAll();
+              playChime();
+              timerRemainingSec = timerTotalSec;
+              updateTimerDisplay();
+            }
+          }, 1000);
+        }
+      }
+
+      // Hangout Mode Timer Logic
+      function startHangoutTimer(mins) {
+        clearInterval(hangoutInterval);
+        hangoutRemainingSec = mins * 60;
+        const endHHMM = minsToTime(timeToMins(getCurrentHHMM()) + mins);
+        const ponr = computePointOfNoReturn();
+
+        if (timeToMins(endHHMM) > timeToMins(ponr.ponrHHMM)) {
+          showToast('Point of No Return Warning!', `A ${mins}m hangout ends at ${endHHMM}, which passes your ${ponr.ponrHHMM} cutoff for pending tasks!`, 'warn');
+        } else {
+          showToast('Hangout Mode Active', `Enjoy your ${mins}m! I'll nudge you at ${endHHMM} (Point of No Return: ${ponr.ponrHHMM}).`, 'info');
+        }
+
+        const updateHangoutUI = () => {
+          const m = Math.floor(hangoutRemainingSec / 60);
+          const s = hangoutRemainingSec % 60;
+          hangoutTimerDisplay.textContent = `${pad(m)}:${pad(s)}`;
+        };
+        updateHangoutUI();
+
+        hangoutInterval = setInterval(() => {
+          hangoutRemainingSec--;
+          updateHangoutUI();
+          if (hangoutRemainingSec <= 0) {
+            clearInterval(hangoutInterval);
+            playChime();
+            showToast('Hangout Time Up!', 'Time to transition back to your priority schedule.', 'warn');
+            const nextPending = state.tasks.find(t => !t.done);
+            if (nextPending) openNudgeModal(nextPending.id);
+          }
+        }, 1000);
+      }
+
+      // Concrete Micro-Task Decomposer (Local Fallback + Gemini API)
+      function buildConcreteStepsForGoal(promptText) {
+        const lower = promptText.toLowerCase();
+        const style = state.learningStyle || 'video';
+        const dur = scaledDuration(25);
+
+        if (lower.includes('os') || lower.includes('operating system') || lower.includes('kernel')) {
+          const steps = style === 'video'
+            ? [
+                `Watch ${dur}m x86 Real-Mode & BIOS Bootloader tutorial + write 3 register notes`,
+                `Write a 512-byte boot.asm with 0xAA55 signature & boot in QEMU (${dur}m)`,
+                `Use BIOS int 0x10 to print 'Hello Kernel' on screen (${dur}m)`,
+                `Watch ${dur}m Global Descriptor Table (GDT) explainer & map 32-bit switch`
+              ]
+            : [
+                `Install NASM + QEMU & assemble a 512-byte infinite loop boot sector (${dur}m)`,
+                `Add BIOS teletype character printing routine in assembly (${dur}m)`,
+                `Write disk-read routine using BIOS int 0x13 to load sector 2 (${dur}m)`
+              ];
+          return { title: 'Develop My Own OS', category: 'Study', steps, duration: dur };
+        }
+
+        if (lower.includes('fit') || lower.includes('workout') || lower.includes('body') || lower.includes('calisthenics')) {
+          const steps = [
+            `${dur}m Bodyweight Circuit: 3x10 Decline Push-ups, 3x12 Squats, 60s Plank`,
+            `15m High-Protein Meal Check & 8,000 Step Progress Review`,
+            `${dur}m Upper-Body Rows, Pike Push-ups & Core Leg Raises`
+          ];
+          return { title: 'Build a Fit Body', category: 'Fitness', steps, duration: dur };
+        }
+
+        return {
+          title: promptText.slice(0, 48),
+          category: 'Study',
+          steps: [
+            `${dur}m ${style === 'video' ? 'Focused Video Lesson + 3 Summary Bullet Notes' : 'Hands-On Practice Exercise'}: ${promptText.slice(0, 35)}`,
+            `${dur}m Active Recall & Implementation Drill: ${promptText.slice(0, 35)}`
+          ],
+          duration: dur
+        };
+      }
+
+      function runLocalFallbackAgent(promptText) {
+        const lower = promptText.toLowerCase();
+
+        if (lower.includes('hangout') || lower.includes('hanging out') || lower.includes('with my person') || lower.includes('spend time')) {
+          const mMatch = lower.match(/(\d+)\s*m/);
+          const mins = mMatch ? Number(mMatch[1]) : 60;
+          startHangoutTimer(mins);
+          const ponr = computePointOfNoReturn();
+          return `Started a ${mins}-minute Hangout Timer for you. Your Point of No Return today is ${ponr.ponrHHMM} (so you still fit in ${ponr.pendingMins}m of pending tasks before ${state.sleepCutoff}). Enjoy your time—I'll nudge you when it's time to transition!`;
+        }
+        if (lower.includes('finished') || lower.includes('completed') || lower.includes('mark') && lower.includes('done')) {
+          const nextTask = state.tasks.find(t => !t.done);
+          if (!nextTask) return `All your scheduled tasks for today are already marked complete!`;
+          nextTask.done = true;
+          lastCompletedTaskId = nextTask.id;
+          adjustXP(25, `Completed "${nextTask.title}" via Secretary!`);
+          paceCalibrationBanner.classList.remove('hidden');
+          saveState();
+          renderAll();
+          return `Marked "${nextTask.title}" as Done (+25 XP)! Quick check: tap the Pace Calibration bar above to tell me if the time was Too Fast, Just Right, or if you Need More Practice.`;
+        }
+        if (lower.includes('start my next task') || lower.includes('start next task')) {
+          const nextTask = state.tasks.find(t => !t.done);
+          if (!nextTask) return `You have no pending tasks left to start! Tell me a goal to schedule one.`;
+          state.pinnedTaskId = nextTask.id;
+          setTimerPreset(nextTask.duration || 25, `${nextTask.duration || 25}m Focus`);
+          if (!timerRunning) toggleTimer();
+          saveState();
+          renderAll();
+          return `Pinned "${nextTask.title}" and started your ${nextTask.duration || 25}-minute focus timer. Let's knock it out!`;
+        }
+        if (lower.includes('snooze') || lower.includes('do later') || lower.includes('push back')) {
+          const nextTask = state.tasks.find(t => !t.done);
+          if (!nextTask) return `No pending tasks to snooze.`;
+          openNudgeModal(nextTask.id);
+          return `Opened the decision card for "${nextTask.title}" (Snoozes used: ${nextTask.snoozeCount || 0}/2). Confirm your new slot in the pop-up.`;
+        }
+        if (lower.includes('low energy') || lower.includes('exhausted') || lower.includes('tired')) {
+          btnLowEnergyMode.click();
+          return `Activated Low-Energy Mode for today (${state.lowEnergyCharges}/2 weekly charges left). All remaining tasks are now 10-minute Minimum Viable Versions so you keep your streak alive.`;
+        }
+        if (lower.includes('remind') || lower.includes('water') || lower.includes('stretch')) {
+          const mMatch = lower.match(/(\d+)\s*min/);
+          const offset = mMatch ? Number(mMatch[1]) : 20;
+          const cleanTitle = promptText.replace(/remind me (to )?/i, '').trim() || 'Hydration & Stretch Check';
+          const slot = getNextSlotHHMM(offset);
+          const t = addTask({ title: cleanTitle, time: slot, duration: 10, category: 'Health', remind: true });
+          return `Got it. I'll nudge you at ${t.time} for "${t.title}".`;
+        }
+        if (lower.includes('priorit') || lower.includes('review')) {
+          const pending = state.tasks.filter(t => !t.done).sort((a, b) => a.time.localeCompare(b.time));
+          const ponr = computePointOfNoReturn();
+          if (pending.length === 0) return `Your schedule is 100% clear today!`;
+          return `You have ${pending.length} pending task(s) (${ponr.pendingMins}m total, Point of No Return: ${ponr.ponrHHMM}). Top priority is "${pending[0].title}" at ${pending[0].time}. Want me to start the timer for it now?`;
+        }
+
+        if (lower.includes('friday') && lower.includes('timetable')) {
+          state.dayMode = 'friday';
+          saveState();
+          renderAll();
+          return `Switched today's schedule to follow Friday's timetable. Free slots recalculated—next open gap is ${findNextOpenSlot(25)}.`;
+        }
+        if (lower.includes('exam week')) {
+          state.dayMode = 'exam';
+          saveState();
+          renderAll();
+          return `Switched to Exam Week mode (regular classes cleared). All daytime slots are open for exam prep.`;
+        }
+        if (lower.includes('procrastinat') || lower.includes('stuck') || lower.includes('start')) {
+          const nextTask = state.tasks.find(t => !t.done);
+          if (nextTask) {
+            state.pinnedTaskId = nextTask.id;
+            saveState();
+            renderAll();
+          }
+          setTimerPreset(2, '2m Micro-Step', nextTask ? nextTask.id : null);
+          if (!timerRunning) toggleTimer();
+          return nextTask
+            ? `Pinned "${nextTask.title}" and started a 2-minute Micro-Step timer. Only commit to 120 seconds right now.`
+            : `Started a 2-minute Micro-Step timer. Open your workspace and do the smallest 2-minute action.`;
+        }
+
+        const plan = buildConcreteStepsForGoal(promptText);
+        const goal = addGoal({
+          title: plan.title,
+          dailyStep: plan.steps[0],
+          baseMinutes: plan.duration,
+          category: plan.category,
+          roadmap: plan.steps
+        });
+        const slot1 = findNextOpenSlot(plan.duration);
+        const end1 = minsToTime(timeToMins(slot1) + plan.duration);
+        const t1 = addTask({
+          title: plan.steps[0],
+          time: slot1,
+          duration: plan.duration,
+          category: plan.category,
+          remind: true
+        });
+        return `Created concrete roadmap for "${goal.title}" (${state.learningStyle} style, ${state.paceMultiplier.toFixed(2)}x pace). Scheduled Step 1 "${t1.title}" for ${slot1}–${end1}.`;
+      }
+
+      async function runGeminiAgent(promptText) {
+        const apiKey = state.apiKey.trim();
+        if (!apiKey) return runLocalFallbackAgent(promptText);
+
+        const ponr = computePointOfNoReturn();
+        const systemInstruction = `You are PulseDesk, a strict-accountability personal secretary and concrete micro-task planner.
+Current time: ${getCurrentHHMM()}. Sleep cutoff: ${state.sleepCutoff}. Point of No Return: ${ponr.ponrHHMM}.
+User learning style: ${state.learningStyle} (video/handson/reading). Pace multiplier: ${state.paceMultiplier}x.
+Locked timetable blocks today: ${JSON.stringify(getActiveTimetableBlocks())}.
+Pending tasks: ${JSON.stringify(state.tasks.filter(t => !t.done).map(t => ({ title: t.title, time: t.time, duration: t.duration, deadline: t.deadline })))}.
+
+NEVER give vague tasks. Break any goal into concrete, time-boxed micro-tasks with exact durations (e.g. "Watch 20m tutorial on X and write 3 bullet notes").
+Respond ONLY with valid JSON:
+{
+  "reply": "Direct, concrete secretary response with exact time range",
+  "dayModeOverride": "normal|friday|exam|holiday|null",
+  "actions": [
+    { "type": "add_goal", "title": "...", "dailyStep": "...", "baseMinutes": 25, "category": "Study|Fitness|Health|Focus|Personal", "roadmap": ["Step 1...", "Step 2...", "Step 3..."] },
+    { "type": "add_task", "title": "Concrete task with exact deliverables", "time": "HH:MM", "duration": 25, "category": "Study|Fitness|Health|Focus|Personal", "deadline": "${getTodayDateString()}" },
+    { "type": "start_focus", "minutes": 2 }
+  ]
+}`;
+
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(state.model)}:generateContent`;
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+          body: JSON.stringify({
+            contents: [{ role: 'user', parts: [{ text: systemInstruction + '\n\nUser request: ' + promptText }] }],
+            generationConfig: { responseMimeType: 'application/json' }
+          })
+        });
+
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData?.error?.message || `HTTP ${res.status}`);
+        }
+
+        const data = await res.json();
+        const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
+        const parsed = JSON.parse(rawText);
+
+        if (parsed.dayModeOverride && ['normal', 'friday', 'exam', 'holiday'].includes(parsed.dayModeOverride)) {
+          state.dayMode = parsed.dayModeOverride;
+        }
+        if (Array.isArray(parsed.actions)) {
+          parsed.actions.forEach(act => {
+            if (act.type === 'add_goal') {
+              addGoal({
+                title: act.title,
+                dailyStep: act.dailyStep,
+                baseMinutes: act.baseMinutes || 25,
+                category: act.category,
+                roadmap: act.roadmap
+              });
+            } else if (act.type === 'add_task') {
+              addTask({
+                title: act.title,
+                time: act.time || findNextOpenSlot(act.duration || 25),
+                duration: scaledDuration(act.duration || 25),
+                category: act.category,
+                deadline: act.deadline || getTodayDateString(),
+                remind: true
+              });
+            } else if (act.type === 'start_focus') {
+              const mins = Number(act.minutes) || 2;
+              setTimerPreset(mins, `${mins}m Focus`);
+              if (!timerRunning) toggleTimer();
+            }
+          });
+        }
+        saveState();
+        renderAll();
+        return parsed.reply || 'Updated your schedule.';
+      }
+
+      async function handleAgentSubmit(customText) {
+        const text = (customText ?? agentInput.value).trim();
+        if (!text) return;
+        agentInput.value = '';
+        addLog('user', text);
+        btnSendAgent.disabled = true;
+        btnSendAgent.classList.add('opacity-60');
+        try {
+          const reply = await runGeminiAgent(text);
+          addLog('agent', reply);
+          speakSecretaryReply(reply);
+        } catch (err) {
+          showToast('Using Offline Engine', err.message, 'warn');
+          addLog('agent', runLocalFallbackAgent(text));
+        } finally {
+          btnSendAgent.disabled = false;
+          btnSendAgent.classList.remove('opacity-60');
+        }
+      }
+
+      // Voice Dictation
+      function toggleDictation() {
+        const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRec) {
+          showToast('Voice Not Supported', 'Use Chrome or Edge for built-in voice dictation.', 'warn');
+          return;
+        }
+        if (isListening && recognition) {
+          recognition.stop();
+          return;
+        }
+        recognition = new SpeechRec();
+        recognition.lang = 'en-US';
+        recognition.interimResults = true;
+        recognition.onstart = () => {
+          isListening = true;
+          btnMic.classList.add('mic-pulse', 'bg-rose-600/30', 'border-rose-500');
+          btnMicText.textContent = 'Listening...';
+          micStatus.textContent = 'Speak now...';
+        };
+        recognition.onresult = (event) => {
+          let transcript = '';
+          for (let i = 0; i < event.results.length; i++) {
+            transcript += event.results[i][0].transcript;
+          }
+          agentInput.value = transcript;
+        };
+        recognition.onend = () => {
+          isListening = false;
+          btnMic.classList.remove('mic-pulse', 'bg-rose-600/30', 'border-rose-500');
+          btnMicText.textContent = 'Dictate';
+          micStatus.textContent = 'Mic Ready';
+        };
+        recognition.start();
+      }
+
+      // Background Clock & Nudge Polling
+      setInterval(() => {
+        const d = new Date();
+        liveClockLabel.textContent = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' • ' + d.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
+        const nowHHMM = getCurrentHHMM();
+        state.tasks.forEach(t => {
+          if (!t.done && t.remind && !t.reminded && t.time === nowHHMM) {
+            t.reminded = true;
+            saveState();
+            playChime();
+            openNudgeModal(t.id);
+          }
+        });
+      }, 10000);
+
+      // Event Listeners
+      btnSendAgent.addEventListener('click', () => handleAgentSubmit());
+      document.getElementById('btnVoiceReplyToggle').addEventListener('click', (e) => {
+        voiceReplyEnabled = !voiceReplyEnabled;
+        e.currentTarget.textContent = voiceReplyEnabled ? '🔊 Voice Reply: On' : '🔊 Voice Reply: Off';
+        showToast('Secretary Voice', voiceReplyEnabled ? 'Secretary will read responses aloud.' : 'Voice read-aloud muted.', 'info');
+      });
+      document.getElementById('secretaryActionChips').addEventListener('click', (e) => {
+        const btn = e.target.closest('button[data-sec-cmd]');
+        if (!btn) return;
+        handleAgentSubmit(btn.dataset.secCmd);
+      });
+      agentInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          handleAgentSubmit();
+        }
+      });
+      btnMic.addEventListener('click', toggleDictation);
+
+      document.querySelectorAll('.quick-prompt').forEach(btn => {
+        btn.addEventListener('click', () => handleAgentSubmit(btn.dataset.prompt));
+      });
+
+      learningStyleSelect.addEventListener('change', () => {
+        state.learningStyle = learningStyleSelect.value;
+        saveState();
+        showToast('Learning Style Updated', `Future goals will prioritize ${state.learningStyle} micro-tasks.`, 'info');
+      });
+
+      dayModeSelect.addEventListener('change', () => {
+        state.dayMode = dayModeSelect.value;
+        saveState();
+        renderAll();
+        showToast('Timetable Mode Switched', `Active mode: ${dayModeSelect.options[dayModeSelect.selectedIndex].text}`, 'info');
+      });
+
+      // Low-Energy Mode (Minimum Viable Day)
+      btnLowEnergyMode.addEventListener('click', () => {
+        if (state.lowEnergyActiveToday) {
+          showToast('Already Active Today', 'Your tasks are already scaled to 10-minute Minimum Viable Versions.', 'info');
+          return;
+        }
+        if ((state.lowEnergyCharges || 0) <= 0) {
+          showToast('No Charges Left', 'You used both Low-Energy charges this week. Try a 2-minute micro-step!', 'warn');
+          return;
+        }
+        state.lowEnergyCharges -= 1;
+        state.lowEnergyActiveToday = true;
+        state.tasks.forEach(t => {
+          if (!t.done) {
+            t.duration = 10;
+            if (!t.title.startsWith('[10m Min-Viable] ')) {
+              t.title = '[10m Min-Viable] ' + t.title;
+            }
+          }
+        });
+        saveState();
+        renderAll();
+        showToast('Low-Energy Mode Activated', 'All pending tasks scaled to 10 minutes so you protect your streak without burnout.', 'warn');
+      });
+
+      // Pace Calibration Feedback Buttons
+      document.querySelectorAll('.pace-feedback-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const feedback = btn.dataset.pace;
+          if (feedback === 'fast') {
+            state.paceMultiplier = Math.max(0.65, Number((state.paceMultiplier * 0.88).toFixed(2)));
+            showToast('Pace Calibrated Faster', `New Pace Multiplier: ${state.paceMultiplier.toFixed(2)}x`, 'success');
+          } else if (feedback === 'slow') {
+            state.paceMultiplier = Math.min(1.75, Number((state.paceMultiplier * 1.2).toFixed(2)));
+            const lastTask = state.tasks.find(t => t.id === lastCompletedTaskId);
+            if (lastTask) {
+              const slot = findNextOpenSlot(15);
+              addTask({
+                title: `15m Practice Drill: ${lastTask.title.slice(0, 40)}`,
+                time: slot,
+                duration: 15,
+                category: lastTask.category,
+                remind: true
+              });
+            }
+            showToast('Pace Adjusted + Practice Added', `New Pace Multiplier: ${state.paceMultiplier.toFixed(2)}x + 15m reinforcement drill scheduled.`, 'info');
+          } else {
+            showToast('Pace Confirmed', `Keeping Pace Multiplier at ${state.paceMultiplier.toFixed(2)}x`, 'info');
+          }
+          paceCalibrationBanner.classList.add('hidden');
+          saveState();
+          renderAll();
+        });
+      });
+
+      // Schedule List Actions
+      scheduleList.addEventListener('click', (e) => {
+        const btn = e.target.closest('button[data-action]');
+        if (!btn) return;
+        const id = btn.dataset.id;
+        const action = btn.dataset.action;
+        const t = state.tasks.find(x => x.id === id);
+        if (!t) return;
+
+        if (action === 'toggle-task') {
+          t.done = !t.done;
+          if (t.done) {
+            lastCompletedTaskId = t.id;
+            adjustXP(25, `Completed "${t.title}" on time!`);
+            paceCalibrationBanner.classList.remove('hidden');
+          }
+        } else if (action === 'delete-task') {
+          state.tasks = state.tasks.filter(x => x.id !== id);
+        } else if (action === 'pin-task') {
+          state.pinnedTaskId = id;
+          setTimerPreset(t.duration || 25, `${t.duration || 25}m Task`);
+          showToast('Task Pinned', `Timer set to ${t.duration || 25}m for "${t.title}".`, 'info');
+        } else if (action === 'nudge-task') {
+          openNudgeModal(id);
+        }
+        saveState();
+        renderAll();
+      });
+
+      // Nudge Modal Buttons
+      document.getElementById('btnCloseNudge').addEventListener('click', () => nudgeModal.classList.add('hidden'));
+      document.getElementById('btnNudgeStartNow').addEventListener('click', () => {
+        const t = state.tasks.find(x => x.id === activeNudgeTaskId);
+        if (t) {
+          state.pinnedTaskId = t.id;
+          adjustXP(5, `Started "${t.title}" right on nudge!`);
+          setTimerPreset(t.duration || 25, `${t.duration || 25}m Focus`);
+          if (!timerRunning) toggleTimer();
+        }
+        nudgeModal.classList.add('hidden');
+        renderAll();
+      });
+
+      document.getElementById('btnNudgeDoLater').addEventListener('click', () => {
+        const t = state.tasks.find(x => x.id === activeNudgeTaskId);
+        if (!t) return;
+        const newTime = document.getElementById('nudgeNewTimeInput').value || findNextOpenSlot(t.duration);
+        if ((t.snoozeCount || 0) === 1 && !t.microStepUnlocked) {
+          adjustXP(-5, `2nd Snooze Tax applied for "${t.title}"`);
+        }
+        t.time = newTime;
+        t.snoozeCount = (t.snoozeCount || 0) + 1;
+        t.reminded = false;
+        saveState();
+        nudgeModal.classList.add('hidden');
+        renderAll();
+        showToast('Task Rescheduled', `Moved "${t.title}" to ${newTime} (Snooze #${t.snoozeCount}).`, 'warn');
+      });
+
+      document.getElementById('btnNudgeMicroStep').addEventListener('click', () => {
+        const t = state.tasks.find(x => x.id === activeNudgeTaskId);
+        if (!t) return;
+        state.pinnedTaskId = t.id;
+        setTimerPreset(2, '2m Unlock Step', t.id);
+        if (!timerRunning) toggleTimer();
+        nudgeModal.classList.add('hidden');
+        renderAll();
+        showToast('2-Min Micro-Step Started', 'Finish 120 seconds to unlock penalty-free rescheduling!', 'info');
+      });
+
+      document.getElementById('btnNudgeSkip').addEventListener('click', () => {
+        const t = state.tasks.find(x => x.id === activeNudgeTaskId);
+        if (!t) return;
+        state.tasks = state.tasks.filter(x => x.id !== activeNudgeTaskId);
+        state.streakDays = 0;
+        adjustXP(-20, `Skipped "${t.title}" — Streak reset to 0d (Strict Accountability)`);
+        nudgeModal.classList.add('hidden');
+        saveState();
+        renderAll();
+      });
+
+      // Goals List Actions
+      goalsList.addEventListener('click', (e) => {
+        const btn = e.target.closest('button[data-action]');
+        if (!btn) return;
+        const id = btn.dataset.id;
+        const action = btn.dataset.action;
+        const g = state.goals.find(x => x.id === id);
+        if (!g) return;
+        if (action === 'delete-goal') {
+          state.goals = state.goals.filter(x => x.id !== id);
+        } else if (action === 'schedule-goal') {
+          const dur = scaledDuration(g.baseMinutes || 25);
+          const slot = findNextOpenSlot(dur);
+          const stepText = (g.roadmap && g.roadmap[0]) ? g.roadmap[0] : g.dailyStep;
+          addTask({ title: stepText, time: slot, duration: dur, category: g.category, remind: true });
+          if (Array.isArray(g.roadmap) && g.roadmap.length > 1) {
+            g.roadmap.push(g.roadmap.shift());
+            g.dailyStep = g.roadmap[0];
+          }
+          g.completedCount = Math.min(g.targetCount, g.completedCount + 1);
+          showToast('Micro-Task Scheduled', `Slotted "${stepText}" at ${slot} (${dur}m)`, 'success');
+        }
+        saveState();
+        renderAll();
+      });
+
+      // Add Task & Goal Forms
+      document.getElementById('btnToggleAddTask').addEventListener('click', () => {
+        document.getElementById('taskTimeInput').value = findNextOpenSlot(25);
+        document.getElementById('taskDeadlineInput').value = getTodayDateString();
+        addTaskForm.classList.toggle('hidden');
+      });
+      document.getElementById('btnCancelTask').addEventListener('click', () => addTaskForm.classList.add('hidden'));
+      addTaskForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        addTask({
+          title: document.getElementById('taskTitleInput').value.trim(),
+          time: document.getElementById('taskTimeInput').value,
+          duration: document.getElementById('taskDurationInput').value,
+          category: document.getElementById('taskCategoryInput').value,
+          deadline: document.getElementById('taskDeadlineInput').value,
+          remind: document.getElementById('taskRemindInput').checked
+        });
+        addTaskForm.reset();
+        addTaskForm.classList.add('hidden');
+      });
+
+      document.getElementById('btnToggleAddGoal').addEventListener('click', () => addGoalForm.classList.toggle('hidden'));
+      document.getElementById('btnCancelGoal').addEventListener('click', () => addGoalForm.classList.add('hidden'));
+      addGoalForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const title = document.getElementById('goalTitleInput').value.trim();
+        const step = document.getElementById('goalStepInput').value.trim();
+        const mins = document.getElementById('goalDurationInput').value;
+        const deadline = document.getElementById('goalDeadlineInput').value;
+        addGoal({ title, dailyStep: step, baseMinutes: mins, deadline, category: 'Study', roadmap: [step] });
+        addGoalForm.reset();
+        addGoalForm.classList.add('hidden');
+      });
+
+      // Hangout Presets
+      document.querySelectorAll('.hangout-preset').forEach(btn => {
+        btn.addEventListener('click', () => startHangoutTimer(Number(btn.dataset.mins)));
+      });
+      document.getElementById('btnStopHangout').addEventListener('click', () => {
+        clearInterval(hangoutInterval);
+        hangoutRemainingSec = 0;
+        hangoutTimerDisplay.textContent = '00:00';
+        showToast('Hangout Ended', 'Ready to jump back into your schedule.', 'info');
+      });
+
+      // Focus Timer Controls
+      btnTimerToggle.addEventListener('click', toggleTimer);
+      document.getElementById('btnTimerReset').addEventListener('click', () => {
+        clearInterval(timerInterval);
+        timerRunning = false;
+        btnTimerToggle.textContent = 'Start';
+        timerRemainingSec = timerTotalSec;
+        updateTimerDisplay();
+      });
+      document.querySelectorAll('.timer-preset').forEach(btn => {
+        btn.addEventListener('click', () => setTimerPreset(Number(btn.dataset.mins), btn.dataset.label));
+      });
+
+      // Mobile Tabs
+      document.querySelectorAll('.mobile-tab').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const target = btn.dataset.tab;
+          document.querySelectorAll('.mobile-tab').forEach(b => {
+            b.className = b === btn
+              ? 'mobile-tab flex-1 py-2 text-xs font-semibold rounded-lg bg-indigo-600 text-white'
+              : 'mobile-tab flex-1 py-2 text-xs font-semibold rounded-lg text-slate-400';
+          });
+          ['schedule', 'goals', 'focus'].forEach(name => {
+            const panel = document.getElementById(`panel-${name}`);
+            if (name === target) {
+              panel.classList.remove('hidden');
+              panel.classList.add('flex');
+            } else {
+              panel.classList.add('hidden');
+              panel.classList.remove('flex');
+            }
+          });
+        });
+      });
+
+      // Schedule Filter Buttons
+      document.querySelectorAll('.sched-filter').forEach(btn => {
+        btn.addEventListener('click', () => {
+          state.filter = btn.dataset.filter;
+          document.querySelectorAll('.sched-filter').forEach(b => {
+            b.className = b === btn
+              ? 'sched-filter px-2.5 py-1 rounded-lg bg-indigo-600/20 text-indigo-300 border border-indigo-500/30 font-medium'
+              : 'sched-filter px-2.5 py-1 rounded-lg bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800';
+          });
+          saveState();
+          renderSchedule();
+        });
+      });
+
+      // Timetable Modal
+      document.getElementById('btnOpenTimetable').addEventListener('click', () => {
+        renderTimetableModal();
+        timetableModal.classList.remove('hidden');
+      });
+      document.getElementById('btnCloseTimetable').addEventListener('click', () => timetableModal.classList.add('hidden'));
+      document.getElementById('sleepCutoffInput').addEventListener('change', (e) => {
+        state.sleepCutoff = e.target.value || '23:30';
+        saveState();
+        renderAll();
+      });
+      document.getElementById('addTimetableSlotForm').addEventListener('submit', (e) => {
+        e.preventDefault();
+        state.timetable.push({
+          id: 'tt_' + Date.now(),
+          day: document.getElementById('ttDayInput').value,
+          title: document.getElementById('ttTitleInput').value.trim(),
+          start: document.getElementById('ttStartInput').value,
+          end: document.getElementById('ttEndInput').value
+        });
+        document.getElementById('ttTitleInput').value = '';
+        saveState();
+        renderTimetableModal();
+        renderAll();
+      });
+      document.getElementById('timetableSlotsList').addEventListener('click', (e) => {
+        const delId = e.target?.dataset?.ttDelete;
+        if (!delId) return;
+        state.timetable = state.timetable.filter(s => s.id !== delId);
+        saveState();
+        renderTimetableModal();
+        renderAll();
+      });
+
+      // Sync & GitHub Modal
+      document.getElementById('btnOpenSync').addEventListener('click', () => {
+        const exportCopy = Object.assign({}, state, { apiKey: '' });
+        document.getElementById('syncCodeTextarea').value = btoa(unescape(encodeURIComponent(JSON.stringify(exportCopy))));
+        syncModal.classList.remove('hidden');
+      });
+      document.getElementById('btnCloseSync').addEventListener('click', () => syncModal.classList.add('hidden'));
+      document.getElementById('btnCopySyncCode').addEventListener('click', () => {
+        const el = document.getElementById('syncCodeTextarea');
+        el.select();
+        try {
+          navigator.clipboard.writeText(el.value);
+        } catch (e) {
+          document.execCommand('copy');
+        }
+        showToast('Sync Code Copied', 'Paste this code on your phone or laptop to sync offline.', 'success');
+      });
+      document.getElementById('btnApplySyncCode').addEventListener('click', () => {
+        const raw = document.getElementById('syncCodeTextarea').value.trim();
+        if (!raw) return;
+        try {
+          const decoded = JSON.parse(decodeURIComponent(escape(atob(raw))));
+          state = Object.assign(state, decoded, { apiKey: state.apiKey, schemaVersion: CURRENT_SCHEMA_VERSION });
+          saveState();
+          renderAll();
+          syncModal.classList.add('hidden');
+          showToast('Devices Synced!', 'Schedule, timetable, XP, and goals merged without data loss.', 'success');
+        } catch (e) {
+          showToast('Invalid Sync Code', 'Make sure you copied the full sync string.', 'error');
+        }
+      });
+
+      // Log Clear & Notifications
+      document.getElementById('btnClearLog').addEventListener('click', () => {
+        state.logs = [];
+        saveState();
+        renderLog();
+      });
+
+      document.getElementById('btnNotifyPerm').addEventListener('click', async () => {
+        if (!('Notification' in window)) {
+          showToast('In-App Alerts Active', 'Audio chime and nudge modals are enabled.', 'info');
+          return;
+        }
+        try {
+          const perm = await Notification.requestPermission();
+          showToast(perm === 'granted' ? 'Notifications Enabled' : 'In-App Alerts Active', 'You will be nudged when tasks start.', 'success');
+        } catch (e) {
+          showToast('In-App Alerts Active', 'Audio chime and nudge modals are enabled.', 'info');
+        }
+      });
+
+      // Settings Modal
+      document.getElementById('btnOpenSettings').addEventListener('click', () => {
+        apiKeyInput.value = state.apiKey || '';
+        modelSelect.value = state.model || 'gemini-3.8-flash';
+        settingsModal.classList.remove('hidden');
+      });
+      document.getElementById('btnCloseSettings').addEventListener('click', () => settingsModal.classList.add('hidden'));
+      document.getElementById('btnSaveSettings').addEventListener('click', () => {
+        state.apiKey = apiKeyInput.value.trim();
+        state.model = modelSelect.value;
+        saveState();
+        renderHeader();
+        settingsModal.classList.add('hidden');
+        showToast('Settings Saved', state.apiKey ? `Connected to ${state.model}` : 'Running in Offline Agent Mode', 'success');
+      });
+
+      document.getElementById('btnFetchModels').addEventListener('click', async () => {
+        const key = apiKeyInput.value.trim();
+        if (!key) {
+          showToast('Enter Key First', 'Paste your Gemini API key above to list models.', 'warn');
+          return;
+        }
+        try {
+          const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(key)}`);
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const data = await res.json();
+          const usable = (data.models || [])
+            .filter(m => (m.supportedGenerationMethods || []).includes('generateContent'))
+            .map(m => m.name.replace('models/', ''));
+          if (usable.length > 0) {
+            modelSelect.innerHTML = usable.map(id => `<option value="${escapeHtml(id)}">${escapeHtml(id)}</option>`).join('');
+            showToast('Models Loaded', `Found ${usable.length} models for your key.`, 'success');
+          }
+        } catch (e) {
+          showToast('Fetch Failed', e.message, 'error');
+        }
+      });
+
+      // Export / Import JSON
+      document.getElementById('btnExportData').addEventListener('click', () => {
+        const exportObj = Object.assign({}, state, { apiKey: '' });
+        const blob = new Blob([JSON.stringify(exportObj, null, 2)], { type: 'application/json' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'pulsedesk-backup-v2.json';
+        a.click();
+      });
+
+      document.getElementById('importFileInput').addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = () => {
+          try {
+            const imported = JSON.parse(reader.result);
+            state = Object.assign(state, imported, { apiKey: state.apiKey, schemaVersion: CURRENT_SCHEMA_VERSION });
+            saveState();
+            renderAll();
+            showToast('Backup Restored', 'Your data was migrated into v2.0 without loss.', 'success');
+          } catch (err) {
+            showToast('Invalid JSON', 'Could not parse backup file.', 'error');
+          }
+        };
+        reader.readAsText(file);
+      });
+
+      // Init
+      liveClockLabel.textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' • ' + new Date().toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
+      updateTimerDisplay();
+      renderAll();
+    })();
+  </script>
+</body>
+</html>
